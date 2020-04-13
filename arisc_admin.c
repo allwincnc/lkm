@@ -231,8 +231,25 @@ lkm_dev_write(struct file *flip, const char *buffer, size_t len, loff_t *offset)
         else if ( !strncmp(token, "/", 1) )
         {
             strncpy(fw_file, token, BUF_LEN);
+
+            fs = get_fs();
+            set_fs(KERNEL_DS);
+            f = filp_open(fw_file, O_RDONLY, 0);
+            i = 0;
+
+            if ( IS_ERR(f) )
+            {
+                i = 1;
+                printk(KERN_INFO DEVICE_NAME": "
+                       "failed to open file %s\n", fw_file);
+            }
+            else filp_close(f, NULL);
+
+            set_fs(fs);
+
             out_buf_len += snprintf(&out_buf[out_buf_len],
-                                    BUF_LEN - out_buf_len, "%s:ok\n", token);
+                                    BUF_LEN - out_buf_len,
+                                    "%s:%s\n", token, (i?"error":"ok"));
 #if DEBUG
             printk(KERN_INFO DEVICE_NAME": " "%s:ok\n", token);
 #endif
