@@ -22,7 +22,8 @@ MODULE_VERSION("1.0");
 
 
 
-#define TEST 0
+#define TEST 0 // 0 = don't write any data to the sys memory
+#define DEBUG 1 // 1 = print debug messages
 
 #define DEVICE_CLASS "arisc"
 #define DEVICE_NAME "arisc_admin"
@@ -80,7 +81,9 @@ static struct file_operations file_ops = {
 /* When a process seek our device, this gets called. */
 static loff_t lkm_dev_llseek(struct file *flip, loff_t offset, int whence)
 {
+#if DEBUG
     printk(KERN_INFO DEVICE_NAME": " "lkm_dev_llseek\n");
+#endif
     return -ESPIPE;
 }
 
@@ -89,7 +92,9 @@ static ssize_t lkm_dev_read(struct file *flip, char *buffer, size_t len, loff_t 
 {
     int todo_len, i;
 
+#if DEBUG
     printk(KERN_INFO DEVICE_NAME": " "lkm_dev_read\n");
+#endif
 
     if ( !len || !out_buf_len ) return 0;
 
@@ -117,7 +122,9 @@ static ssize_t lkm_dev_write(struct file *flip, const char *buffer, size_t len, 
     char buf[BUF_LEN+2];
     char in_buf[BUF_LEN+2];
 
+#if DEBUG
     printk(KERN_INFO DEVICE_NAME": " "lkm_dev_write\n");
+#endif
 
     if ( !len ) return 0;
 
@@ -147,7 +154,9 @@ static ssize_t lkm_dev_write(struct file *flip, const char *buffer, size_t len, 
 #endif
             iounmap(mem_addr);
             out_buf_len += snprintf(&out_buf[out_buf_len], BUF_LEN - out_buf_len, "%s:ok\n", token);
+#if DEBUG
             printk(KERN_INFO DEVICE_NAME": " "%s:ok\n", token);
+#endif
         }
         // upload the firmware
         else if ( !strcmp(token, "upload") )
@@ -173,13 +182,14 @@ static ssize_t lkm_dev_write(struct file *flip, const char *buffer, size_t len, 
                     if ( file_offset >= cpu[cpu_id].fw_max_size ) break;
                     if ( (file_offset + n) >= cpu[cpu_id].fw_max_size )
                         n = cpu[cpu_id].fw_max_size - file_offset;
-#if TEST
+#if DEBUG
                     printk(KERN_INFO DEVICE_NAME": "
                            "%u bytes copied from file offset %u to the mem address 0x%08x\n",
                            (unsigned int) n,
                            (unsigned int) (file_offset - n),
                            (unsigned int) (cpu[cpu_id].fw_dest_addr + file_offset - n) );
-#else
+#endif
+#if !TEST
                     memcpy_toio(mem_addr + file_offset - n, buf, n);
 #endif
                 }
@@ -192,14 +202,18 @@ static ssize_t lkm_dev_write(struct file *flip, const char *buffer, size_t len, 
 
             out_buf_len += snprintf(&out_buf[out_buf_len], BUF_LEN - out_buf_len,
                                     "%s:%s\n", token, (i?"error":"ok"));
+#if DEBUG
             printk(KERN_INFO DEVICE_NAME": " "%s:%s\n", token, (i?"error":"ok"));
+#endif
         }
         // update the firmware file path
         else if ( !strncmp(token, "/", 1) )
         {
             strncpy(fw_file, token, BUF_LEN);
             out_buf_len += snprintf(&out_buf[out_buf_len], BUF_LEN - out_buf_len, "%s:ok\n", token);
+#if DEBUG
             printk(KERN_INFO DEVICE_NAME": " "%s:ok\n", token);
+#endif
         }
         // update CPU id
         else
@@ -208,7 +222,9 @@ static ssize_t lkm_dev_write(struct file *flip, const char *buffer, size_t len, 
             {
                 cpu_id = i;
                 out_buf_len += snprintf(&out_buf[out_buf_len], BUF_LEN - out_buf_len, "%s:ok\n", token);
+#if DEBUG
                 printk(KERN_INFO DEVICE_NAME": " "%s:ok\n", token);
+#endif
                 break;
             }
         }
@@ -223,7 +239,9 @@ static int lkm_dev_open(struct inode *inode, struct file *file)
     if ( lkm_dev_opened ) return -EBUSY;
     lkm_dev_opened = 1;
     try_module_get(THIS_MODULE);
+#if DEBUG
     printk(KERN_INFO DEVICE_NAME": " "lkm_dev_open\n");
+#endif
     return 0;
 }
 
@@ -232,7 +250,9 @@ static int lkm_dev_release(struct inode *inode, struct file *file)
 {
     lkm_dev_opened = 0;
     module_put(THIS_MODULE);
+#if DEBUG
     printk(KERN_INFO DEVICE_NAME": " "lkm_dev_release\n");
+#endif
     return 0;
 }
 
@@ -249,7 +269,9 @@ static int __init lkm_init(void)
         return lkm_major_num;
     }
     // cat /proc/devices
+#if DEBUG
     printk(KERN_INFO DEVICE_NAME": " "registered correctly with major number %d\n", lkm_major_num);
+#endif
 
     // Register the device class
     lkm_dev_class = class_create(THIS_MODULE, DEVICE_CLASS);
@@ -260,7 +282,9 @@ static int __init lkm_init(void)
         return PTR_ERR(lkm_dev_class);
     }
     // ls /sys/class
+#if DEBUG
     printk(KERN_INFO DEVICE_NAME": " "device class registered correctly\n");
+#endif
 
     // Register the device driver
     lkm_dev = device_create(lkm_dev_class, NULL, MKDEV(lkm_major_num, 0), NULL, DEVICE_NAME);
@@ -272,7 +296,9 @@ static int __init lkm_init(void)
         return PTR_ERR(lkm_dev);
     }
     // ls /dev/
+#if DEBUG
     printk(KERN_INFO DEVICE_NAME": " "device class created correctly\n");
+#endif
 
     return 0;
 }
@@ -283,7 +309,9 @@ static void __exit lkm_exit(void)
     class_unregister(lkm_dev_class);
     class_destroy(lkm_dev_class);
     unregister_chrdev(lkm_major_num, DEVICE_NAME);
+#if DEBUG
     printk(KERN_INFO DEVICE_NAME": " "module unloaded.\n");
+#endif
 }
 
 /* Register module functions */
