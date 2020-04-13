@@ -153,7 +153,7 @@ lkm_dev_write(struct file *flip, const char *buffer, size_t len, loff_t *offset)
 
     // cleanup new data string
     string = strim(in_buf);
-    for ( i = strlen(string) + 1; i--; )
+    for ( i = strlen(string); i--; )
         if ( string[i] == 10 || string[i] == 13 ) string[i] = 32;
 
     // parse new data string
