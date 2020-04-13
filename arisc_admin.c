@@ -228,7 +228,7 @@ lkm_dev_write(struct file *flip, const char *buffer, size_t len, loff_t *offset)
 #endif
         }
         // update the firmware file path
-        else if ( !strncmp(token, "/", 1) )
+        else if ( token[0] == '/' )
         {
             strncpy(fw_file, token, BUF_LEN);
 
