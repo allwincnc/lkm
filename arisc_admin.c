@@ -26,13 +26,11 @@ MODULE_VERSION("1.0");
 
 #define DEVICE_CLASS "arisc"
 #define DEVICE_NAME "arisc_admin"
-#define BUF_LEN 250
+#define BUF_LEN 256
 
 
 
 
-static char in_buf[BUF_LEN+2] = {0};
-static int in_buf_len = 0;
 static char out_buf[BUF_LEN+2] = {0};
 static int out_buf_len = 0;
 static int lkm_major_num;
@@ -116,7 +114,8 @@ static ssize_t lkm_dev_write(struct file *flip, const char *buffer, size_t len, 
     size_t n;
     mm_segment_t fs;
     loff_t file_offset;
-    char buf[256+2];
+    char buf[BUF_LEN+2];
+    char in_buf[BUF_LEN+2];
 
     printk(KERN_INFO DEVICE_NAME": " "lkm_dev_write\n");
 
@@ -129,8 +128,7 @@ static ssize_t lkm_dev_write(struct file *flip, const char *buffer, size_t len, 
     // get new data string
     todo_len = (len < BUF_LEN ? len : BUF_LEN);
     i = copy_from_user(in_buf, buffer, todo_len);
-    in_buf_len = todo_len;
-    in_buf[in_buf_len] = 0;
+    in_buf[todo_len] = 0;
     *offset = 0;
 
     // cleanup new data string
