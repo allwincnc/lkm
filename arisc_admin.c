@@ -353,10 +353,15 @@ lkm_init(void)
 static void __exit
 lkm_exit(void)
 {
-    device_destroy(lkm_dev_class, MKDEV(lkm_major_num, 0));
-    class_unregister(lkm_dev_class);
-    class_destroy(lkm_dev_class);
-    unregister_chrdev(lkm_major_num, DEVICE_NAME);
+    if ( !IS_ERR(lkm_dev_class) )
+    {
+        if ( lkm_major_num >= 0 )
+            device_destroy(lkm_dev_class, MKDEV(lkm_major_num, 0));
+        class_unregister(lkm_dev_class);
+        class_destroy(lkm_dev_class);
+    }
+    if ( lkm_major_num >= 0 )
+        unregister_chrdev(lkm_major_num, DEVICE_NAME);
     #if DEBUG
         printk(KERN_INFO DEVICE_NAME": " "module unloaded.\n");
     #endif
