@@ -44,15 +44,17 @@ typedef struct
     const char *name;
     unsigned int fw_dest_addr;
     unsigned int fw_max_size;
+    unsigned int fw_reset_mem_addr;
+    unsigned int fw_reset_reg_mask;
 } cpu_t;
 
 enum { H2, H3, H5, CPU_CNT };
 
 static const cpu_t cpu[CPU_CNT] =
 {
-    {"H2", 0x00040000, (8+8+32)*1024},
-    {"H3", 0x00040000, (8+8+32)*1024},
-    {"H5", 0x00040000, (8+8+64)*1024}
+    {"H2", 0x00040000, (8+8+32)*1024, 0x01F01C00, 0x00000001},
+    {"H3", 0x00040000, (8+8+32)*1024, 0x01F01C00, 0x00000001},
+    {"H5", 0x00040000, (8+8+64)*1024, 0x01F01C00, 0x00000001}
 };
 
 static int cpu_id = H3;
@@ -128,6 +130,7 @@ lkm_dev_write(struct file *flip, const char *buffer, size_t len, loff_t *offset)
     loff_t file_offset;
     char buf[BUF_LEN+2];
     char in_buf[BUF_LEN+2];
+    unsigned long reg_val;
 
     #if DEBUG
         printk(KERN_INFO DEVICE_NAME": " "lkm_dev_write\n");
@@ -159,8 +162,53 @@ lkm_dev_write(struct file *flip, const char *buffer, size_t len, loff_t *offset)
     // parse new data string
     while ( (token = strsep(&string," ")) != NULL )
     {
+        // get arisc core status
+        if ( !strcmp(token, "status") )
+        {
+            mem_addr = ioremap(cpu[cpu_id].fw_reset_mem_addr, 4);
+            reg_val = readl(mem_addr);
+            iounmap(mem_addr);
+            #if DEBUG
+                printk(KERN_INFO DEVICE_NAME": " "%s:%lu\n", token, reg_val);
+            #endif
+            out_buf_len += snprintf(&out_buf[out_buf_len],
+                                    BUF_LEN - out_buf_len,
+                                    "%s:%lu\n", token, reg_val);
+        }
+        // stop the arisc core
+        else if ( !strcmp(token, "stop") )
+        {
+            mem_addr = ioremap(cpu[cpu_id].fw_reset_mem_addr, 4);
+            reg_val = readl(mem_addr);
+            reg_val &= ~(cpu[i].fw_reset_reg_mask);
+            #if !TEST
+                writel(reg_val, mem_addr);
+            #endif
+            iounmap(mem_addr);
+            out_buf_len += snprintf(&out_buf[out_buf_len],
+                                    BUF_LEN - out_buf_len, "%s:ok\n", token);
+            #if DEBUG
+                printk(KERN_INFO DEVICE_NAME": " "%s:ok\n", token);
+            #endif
+        }
+        // start the arisc core
+        else if ( !strcmp(token, "start") )
+        {
+            mem_addr = ioremap(cpu[cpu_id].fw_reset_mem_addr, 4);
+            reg_val = readl(mem_addr);
+            reg_val |= cpu[i].fw_reset_reg_mask;
+            #if !TEST
+                writel(reg_val, mem_addr);
+            #endif
+            iounmap(mem_addr);
+            out_buf_len += snprintf(&out_buf[out_buf_len],
+                                    BUF_LEN - out_buf_len, "%s:ok\n", token);
+            #if DEBUG
+                printk(KERN_INFO DEVICE_NAME": " "%s:ok\n", token);
+            #endif
+        }
         // erase the firmware
-        if ( !strcmp(token, "erase") )
+        else if ( !strcmp(token, "erase") )
         {
             mem_addr = ioremap(cpu[cpu_id].fw_dest_addr,
                                cpu[cpu_id].fw_max_size);
