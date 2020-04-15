@@ -45,16 +45,15 @@ typedef struct
     unsigned int fw_dest_addr;
     unsigned int fw_max_size;
     unsigned int fw_reset_mem_addr;
-    unsigned int fw_reset_reg_mask;
 } cpu_t;
 
 enum { H2, H3, H5, CPU_CNT };
 
 static const cpu_t cpu[CPU_CNT] =
 {
-    {"H2", 0x00040000, (8+8+32)*1024, 0x01F01C00, 0x00000001},
-    {"H3", 0x00040000, (8+8+32)*1024, 0x01F01C00, 0x00000001},
-    {"H5", 0x00040000, (8+8+64)*1024, 0x01F01C00, 0x00000001}
+    {"H2", 0x00040000, (8+8+32)*1024, 0x01F01C00},
+    {"H3", 0x00040000, (8+8+32)*1024, 0x01F01C00},
+    {"H5", 0x00040000, (8+8+64)*1024, 0x01F01C00}
 };
 
 static int cpu_id = H3;
@@ -183,10 +182,8 @@ lkm_dev_write(struct file *flip, const char *buffer, size_t len, loff_t *offset)
         else if ( !strcmp(token, "stop") )
         {
             mmap_addr = ioremap(page_addr, pages*PAGE_SIZE);
-            reg_val = readl(mmap_addr + off);
-            reg_val &= ~(cpu[i].fw_reset_reg_mask);
             #if !TEST
-                writel(reg_val, mmap_addr + off);
+                writel(0UL, mmap_addr + off);
             #endif
             iounmap(mmap_addr);
             out_buf_len += snprintf(&out_buf[out_buf_len],
@@ -199,10 +196,8 @@ lkm_dev_write(struct file *flip, const char *buffer, size_t len, loff_t *offset)
         else if ( !strcmp(token, "start") )
         {
             mmap_addr = ioremap(page_addr, pages*PAGE_SIZE);
-            reg_val = readl(mmap_addr + off);
-            reg_val |= cpu[i].fw_reset_reg_mask;
             #if !TEST
-                writel(reg_val, mmap_addr + off);
+                writel(1UL, mmap_addr + off);
             #endif
             iounmap(mmap_addr);
             out_buf_len += snprintf(&out_buf[out_buf_len],
