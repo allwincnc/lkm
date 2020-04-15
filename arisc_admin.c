@@ -123,7 +123,7 @@ lkm_dev_write(struct file *flip, const char *buffer, size_t len, loff_t *offset)
 {
     int todo_len, i;
     char *string, *token;
-    void __iomem * mem_addr;
+    void __iomem * mmap_addr;
     struct file *f;
     size_t n;
     mm_segment_t fs;
@@ -162,12 +162,16 @@ lkm_dev_write(struct file *flip, const char *buffer, size_t len, loff_t *offset)
     // parse new data string
     while ( (token = strsep(&string," ")) != NULL )
     {
+        #define real_addr   (cpu[cpu_id].fw_reset_mem_addr)
+        #define page_addr   (real_addr & PAGE_MASK)
+        #define pages       (real_addr / PAGE_SIZE + 1)
+        #define off         (real_addr & ~PAGE_MASK)
         // get arisc core status
         if ( !strcmp(token, "status") )
         {
-            mem_addr = ioremap(cpu[cpu_id].fw_reset_mem_addr, 4);
-            reg_val = readl(mem_addr);
-            iounmap(mem_addr);
+            mmap_addr = ioremap(page_addr, pages*PAGE_SIZE);
+            reg_val = readl(mmap_addr + off);
+            iounmap(mmap_addr);
             #if DEBUG
                 printk(KERN_INFO DEVICE_NAME": " "%s:%lu\n", token, reg_val);
             #endif
@@ -178,13 +182,13 @@ lkm_dev_write(struct file *flip, const char *buffer, size_t len, loff_t *offset)
         // stop the arisc core
         else if ( !strcmp(token, "stop") )
         {
-            mem_addr = ioremap(cpu[cpu_id].fw_reset_mem_addr, 4);
-            reg_val = readl(mem_addr);
+            mmap_addr = ioremap(page_addr, pages*PAGE_SIZE);
+            reg_val = readl(mmap_addr + off);
             reg_val &= ~(cpu[i].fw_reset_reg_mask);
             #if !TEST
-                writel(reg_val, mem_addr);
+                writel(reg_val, mmap_addr + off);
             #endif
-            iounmap(mem_addr);
+            iounmap(mmap_addr);
             out_buf_len += snprintf(&out_buf[out_buf_len],
                                     BUF_LEN - out_buf_len, "%s:ok\n", token);
             #if DEBUG
@@ -194,28 +198,32 @@ lkm_dev_write(struct file *flip, const char *buffer, size_t len, loff_t *offset)
         // start the arisc core
         else if ( !strcmp(token, "start") )
         {
-            mem_addr = ioremap(cpu[cpu_id].fw_reset_mem_addr, 4);
-            reg_val = readl(mem_addr);
+            mmap_addr = ioremap(page_addr, pages*PAGE_SIZE);
+            reg_val = readl(mmap_addr + off);
             reg_val |= cpu[i].fw_reset_reg_mask;
             #if !TEST
-                writel(reg_val, mem_addr);
+                writel(reg_val, mmap_addr + off);
             #endif
-            iounmap(mem_addr);
+            iounmap(mmap_addr);
             out_buf_len += snprintf(&out_buf[out_buf_len],
                                     BUF_LEN - out_buf_len, "%s:ok\n", token);
             #if DEBUG
                 printk(KERN_INFO DEVICE_NAME": " "%s:ok\n", token);
             #endif
         }
+        #undef real_addr
+        #undef page_addr
+        #undef pages
+        #undef off
         // erase the firmware
         else if ( !strcmp(token, "erase") )
         {
-            mem_addr = ioremap(cpu[cpu_id].fw_dest_addr,
+            mmap_addr = ioremap(cpu[cpu_id].fw_dest_addr,
                                cpu[cpu_id].fw_max_size);
             #if !TEST
-                memset_io(mem_addr, 0, cpu[cpu_id].fw_max_size);
+                memset_io(mmap_addr, 0, cpu[cpu_id].fw_max_size);
             #endif
-            iounmap(mem_addr);
+            iounmap(mmap_addr);
             out_buf_len += snprintf(&out_buf[out_buf_len],
                                     BUF_LEN - out_buf_len, "%s:ok\n", token);
             #if DEBUG
@@ -225,7 +233,7 @@ lkm_dev_write(struct file *flip, const char *buffer, size_t len, loff_t *offset)
         // upload the firmware
         else if ( !strcmp(token, "upload") )
         {
-            mem_addr = ioremap(cpu[cpu_id].fw_dest_addr,
+            mmap_addr = ioremap(cpu[cpu_id].fw_dest_addr,
                                cpu[cpu_id].fw_max_size);
 
             fs = get_fs();
@@ -258,14 +266,14 @@ lkm_dev_write(struct file *flip, const char *buffer, size_t len, loff_t *offset)
                                                file_offset - n) );
                     #endif
                     #if !TEST
-                        memcpy_toio(mem_addr + file_offset - n, buf, n);
+                        memcpy_toio(mmap_addr + file_offset - n, buf, n);
                     #endif
                 }
                 filp_close(f, NULL);
             }
 
             set_fs(fs);
-            iounmap(mem_addr);
+            iounmap(mmap_addr);
 
             out_buf_len += snprintf(&out_buf[out_buf_len],
                                     BUF_LEN - out_buf_len,
